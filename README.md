@@ -3,7 +3,7 @@ CS 430 Project 2: Raycasting
 
 The following issues are present in this implementation:
 - The image gets distorted when the dimensions are not square
-- The program cannot handle larger image sizes (e.g. above 500x500)
+- The program cannot handle larger image sizes (e.g. above 300x300)
 
 
 HOW TO RUN THE PROGRAM:
