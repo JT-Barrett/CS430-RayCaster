@@ -29,6 +29,10 @@ int main(int argc, char* argv[]){
   
   int width = atoi(argv[1]);
   int height = atoi(argv[2]);
+  if (width > 300 || height > 300){
+    fprintf(stderr, "Error: This program cannot handle images that large.\n");
+    return 1;
+  }
   int pixbuffer[width*height*3];
   raycast(pixbuffer, scene, num_objects, width, height);
 
