@@ -1,8 +1,8 @@
 #define SCENE_FILE "example.json"
 #define OUTPUT_FILE "output.ppm"
 #define ORIGIN 0
-#define PIXELS_M 8
-#define PIXELS_N 8
+#define PIXELS_M 100
+#define PIXELS_N 100
 #define MAX_DEPTH 255
 
 //Needed Structs and Types
@@ -42,7 +42,7 @@ typedef Object Scene[128];
 //Main method prototypes
 int read_scene(char* json, Scene scene);
 int raycast (Pixbuff buffer, Scene scene, int num_objects);
-int ppm_output(Pixbuff buffer, char *output_file_name, int size, int format, int depth);
+int ppm_output(Pixbuff buffer, char *output_file_name, int size, int depth);
 
 //Parser prototypes
 double* next_vector(FILE* json);

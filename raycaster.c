@@ -1,8 +1,8 @@
 /*********************************************************************
 | Title: raycaster.c
 | Author: JT Barrett
-|
-|
+| Assignment: CS 430 - Computer Graphics: Project 2
+| Date Completed: 10/4/2016
 \*********************************************************************/
 
 #include <stdio.h>
@@ -14,28 +14,27 @@
 #include "raycaster.h"
 
 int main(int argc, char** argv){
-  
+  //Uncomment debugging prints for more information
 
   //Create the scene of objects and parse the json file into it
   Object *scene = malloc(sizeof(Object)*128);
   int num_objects = read_scene(SCENE_FILE, scene);
-  printf("\n%d\n", num_objects);
 
   //Take the scene and do the raycasting to generate a pixel buffer
   Pixbuff pixbuffer;
   raycast(pixbuffer, scene, num_objects);
 
-  for (int i = 0; i < PIXELS_M*PIXELS_N*3; i++)
-    printf("%d ", pixbuffer[i]);
-
   //Take the pixel buffer and write it as a valid ppm file.
-  //ppm_output(&buffer, OUTPUT_FILE, sizeof(buffer), 3, 255);
-  printf("\n%d\n %lf %lf", scene[0].kind, scene[0].camera.width, scene[0].camera.height);
+  ppm_output(pixbuffer, OUTPUT_FILE, sizeof(int)*(PIXELS_M*PIXELS_N*3), 255);
 
-  for (int i = 0; i < 3; i++){
-    printf("\n|%lf|", scene[1].sphere.center[i]);
-  }
-  printf("\nmain exiting\n");
+    //printf("\nNumber of Objects: %d\n", num_objects);
+
+  /*for (int i = 0; i < PIXELS_M*PIXELS_N*3; i++)
+    printf("%d ", pixbuffer[i]);
+  */
+
+  //printf("\nCamera Info: %d\n %lf %lf", scene[0].kind, scene[0].camera.width, scene[0].camera.height);
+
   return 0;
 }
 
@@ -87,17 +86,18 @@ int read_scene(char* json_input, Scene scene){
 
       char* value = next_string(json);
 
+      //extract the object type
       if (strcmp(value, "camera") == 0) {
         scene[obj_num].kind = 3;
-        printf("||Camera Recognized||\n");
+        //printf("||Camera Recognized||\n");
       }
       else if (strcmp(value, "sphere") == 0) {
         scene[obj_num].kind = 1;
-        printf("||Sphere Recognized||\n");
+        //printf("||Sphere Recognized||\n");
       }
       else if (strcmp(value, "plane") == 0) {
         scene[obj_num].kind = 2;
-        printf("||Plane Recognized||\n");
+        //printf("||Plane Recognized||\n");
       }
       else {
         fprintf(stderr, "Error: Unknown type, \"%s\"\n", value);
@@ -106,6 +106,7 @@ int read_scene(char* json_input, Scene scene){
 
       skip_ws(json);
 
+      //extract any other fields
       while (1) {
         // , }
         c = next_c(json);
@@ -121,16 +122,15 @@ int read_scene(char* json_input, Scene scene){
           expect_c(json, ':');
           skip_ws(json);
 
+          //check the object type, and insert into the appropriate fields
           if (scene[obj_num].kind == 3){
             if (strcmp(key, "width") == 0){
               double value = next_number(json);              
-              memcpy(&scene[obj_num].camera.width, &value, sizeof(double));
-              printf("width%lf\n", value);   
+              memcpy(&scene[obj_num].camera.width, &value, sizeof(double));  
             }else if (strcmp(key, "height") == 0){
               double value = next_number(json);
               scene[obj_num].camera.height = value;
               memcpy(&scene[obj_num].camera.height, &value, sizeof(double));
-              printf("width%lf\n", value);
             }else{
               fprintf(stderr, "Error: Unrecognized field \"%s\" for 'camera'.\n.", key);
               exit(1);
@@ -178,7 +178,7 @@ int read_scene(char* json_input, Scene scene){
         skip_ws(json);
       }
 
-      printf("--New Object Loaded--\n");
+      //printf("--New Object Loaded--\n");
       obj_num++;
       /*else {
         fprintf(stderr, "Error: Unexpected value\n");
@@ -187,6 +187,7 @@ int read_scene(char* json_input, Scene scene){
     }
     skip_ws(json);
     c = next_c(json);
+    //check if end of object or end of json file
     if (c == ',') {
       // noop
       skip_ws(json);
@@ -200,18 +201,22 @@ int read_scene(char* json_input, Scene scene){
       exit(1);
     }
   }
+
+  //return how many objects were parsed
   return obj_num;
 }
 
+// This method creates the viewplane and loops through each object checking for colisions for each ray
+// Each ray is then converted to a pixel on the screen and placed into a pixel array for PPM output.
 int raycast(Pixbuff buffer, Scene scene, int num_objects){
 
-  int zero = 0;
-
+  //camera starts at 0, load in camera dimensions
   double cx = 0;
   double cy = 0;
   double h = scene[0].camera.height;
   double w = scene[0].camera.width;
 
+  //set the image dimensions
   int M = PIXELS_M;
   int N = PIXELS_N;
 
@@ -229,11 +234,13 @@ int raycast(Pixbuff buffer, Scene scene, int num_objects){
       };
       normalize(Rd);
 
+      //initialize variables for closest colision, then loop over objects looking for colisions
       double best_t = INFINITY;
       int best_obj = 0;
       for (int i = 1; i < num_objects; i += 1) {
         double t = 0;
 
+        //check object type and send to appropriate colision check
         switch (scene[i].kind) {
         case 0:
           t = cylinder_intersection(Ro, Rd,
@@ -245,19 +252,25 @@ int raycast(Pixbuff buffer, Scene scene, int num_objects){
             scene[i].sphere.center,
             scene[i].sphere.radius);
           break;
+        /*case 2:
+        t = plane_intersection(Ro, Rd,
+          scene[i].sphere.center,
+          scene[i].sphere.radius);
+        break;*/
         default:
           // Horrible error
           exit(1);
         }
 
+        //set closest colision variables
         if (t > 0 && t < best_t){
           best_t = t;
           best_obj = i;
         }
       }
 
+      //Initialize a pixel and convert the scene's 0.0-1.0 color to 0-255 color
       Pixel pix;
-
       if (best_t > 0 && best_t != INFINITY) {
         pix.r = (int)floor(scene[best_obj].color[0]*255.0);
         pix.b = (int)floor(scene[best_obj].color[1]*255.0);
@@ -271,55 +284,49 @@ int raycast(Pixbuff buffer, Scene scene, int num_objects){
         //printf(".");
       }
 
-      int e = (int)floor(scene[best_obj].color[0]*255.0);
-      printf("\nPixel: %d %d %d\n", pix.r, pix.b, pix.g);
+      //load the pixel data into the pixel buffer
+      //printf("\nPixel: %d %d %d\n", pix.r, pix.b, pix.g);
       buffer[current_pixel++] = pix.r;
       buffer[current_pixel++] = pix.b;
       buffer[current_pixel++] = pix.g;
 
     }
-    printf("\n");
   }
 
   return 0;
 }
 
-int ppm_output(Pixbuff buffer, char *output_file_name, int size, int format, int depth){
-  FILE *output_file;
-  int i, j, num_pix;
+//This method takes an array of color values as integers and writes them to a PPM P3 file.
+int ppm_output(Pixbuff buffer, char *output_file_name, int size, int depth){
 
+  // Attempt to open outfile
+  FILE *output_file;
   output_file = fopen(output_file_name, "w");
   if (!output_file)
   {
     fprintf(stderr, "\nError: Could not open file for write.");
     fclose(output_file);
-    return -1;
+    exit(1);
   }
-  else
-  {
-    fprintf(output_file, "P%d\n%d %d\n%d\n", format, PIXELS_M, PIXELS_N, depth);
-    // Print out to the outfile in P6 format
-    if (format == 6)
-    {
-      num_pix = fwrite((void *)buffer, 1, (size_t)size, output_file);
-    }
-    // Print out to the outfile in P3 format
-    else if (format == 3)
-    {   //printf("doing stuff!");
-      for (i = 0; i<PIXELS_N; i++)
+
+  else {
+    //Write the PPM P3 header
+    fprintf(output_file, "P3\n%d %d\n%d\n", PIXELS_M, PIXELS_N, depth);
+    //Append pixel data onto the rest of the file
+      for (int i = 0; i<PIXELS_N; i++)
       {
-        for (j = 0; j<PIXELS_M; j++)
+        for (int j = 0; j<PIXELS_M; j++)
         {
           fprintf(output_file, "%d ", buffer[i*PIXELS_M * 3 + 3 * j]);
           fprintf(output_file, "%d ", buffer[i*PIXELS_M * 3 + 3 * j + 1]);
           fprintf(output_file, "%d ", buffer[i*PIXELS_M * 3 + 3 * j + 2]);
         }
-        // Add a new line character after each line pixels have been added to the outfile
+        // Add newline after each line
         fprintf(output_file, "\n");
       }
-    }
   }
 
+  //close up the output file
   fclose(output_file);
   return 0;
 }
