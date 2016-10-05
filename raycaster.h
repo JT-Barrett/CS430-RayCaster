@@ -1,14 +1,12 @@
-#ifdef RAYCASTER_H
-#define RAYCASTER_H
-
-#define SCENE_FILE "example_sphere.json"
+#define SCENE_FILE "example.json"
 #define OUTPUT_FILE "output.ppm"
 #define ORIGIN 0
-#define PIXELS_W 20
-#define PIXELS_H 20
+#define PIXELS_M 8
+#define PIXELS_N 8
 #define MAX_DEPTH 255
 
 //Needed Structs and Types
+
 typedef struct Object{
   int kind; // 0 = cylinder, 1 = sphere, 2 = plane, 3 = camera
   double color[3];
@@ -34,21 +32,17 @@ typedef struct Object{
   };
 } Object;
 
-typdef struct Pixel{
-  char r,g,b;
+typedef struct Pixel{
+  int r,g,b;
 } Pixel;
 
-typedef struct Pixmap {
-    int width, height, ppm_format;
-    unsigned char *image;
-} Pixmap;
+typedef unsigned int Pixbuff[PIXELS_M*PIXELS_N*3];
 
 typedef Object Scene[128];
-
 //Main method prototypes
-void read_scene(char* json, Scene *scene);
-int raycast (Pixmap *buffer, Scene *scene);
-int ppm_output(Pixmap *buffer, char *output_file_name, int size, int format, int depth);
+int read_scene(char* json, Scene scene);
+int raycast (Pixbuff buffer, Scene scene, int num_objects);
+int ppm_output(Pixbuff buffer, char *output_file_name, int size, int format, int depth);
 
 //Parser prototypes
 double* next_vector(FILE* json);
@@ -71,5 +65,5 @@ static inline void normalize(double* v) {
   v[1] /= len;
   v[2] /= len;
 }
-
-#endif
+static inline int float_color_to_int(double d){
+}
