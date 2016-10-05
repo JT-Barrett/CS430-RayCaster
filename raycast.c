@@ -11,21 +11,29 @@
 #include <limits.h>
 #include <math.h>
 #include <ctype.h>
-#include "raycaster.h"
+#include "raycast.h"
 
-int main(int argc, char** argv){
+int main(int argc, char* argv[]){
   //Uncomment debugging prints for more information
+
+  if (argc != EXPECTED_ARGS){
+    fprintf(stderr, "Error: The program was not passed the correct number of arguments.\n");
+    return 1;
+  }
 
   //Create the scene of objects and parse the json file into it
   Object *scene = malloc(sizeof(Object)*128);
-  int num_objects = read_scene(SCENE_FILE, scene);
+  int num_objects = read_scene(argv[3], scene);
 
   //Take the scene and do the raycasting to generate a pixel buffer
-  Pixbuff pixbuffer;
-  raycast(pixbuffer, scene, num_objects);
+  
+  int width = atoi(argv[1]);
+  int height = atoi(argv[2]);
+  int pixbuffer[width*height*3];
+  raycast(pixbuffer, scene, num_objects, width, height);
 
   //Take the pixel buffer and write it as a valid ppm file.
-  ppm_output(pixbuffer, OUTPUT_FILE, sizeof(int)*(PIXELS_M*PIXELS_N*3), 255);
+  ppm_output(pixbuffer, argv[4], sizeof(int)*(width*height*3), 255, width, height);
 
     //printf("\nNumber of Objects: %d\n", num_objects);
 
@@ -45,7 +53,6 @@ int main(int argc, char** argv){
 int read_scene(char* json_input, Scene scene){
   int c;
   FILE* json = fopen(json_input, "r");
-
   if (json == NULL) {
     fprintf(stderr, "Error: Could not open file \"%s\"\n", json);
     exit(1);
@@ -208,7 +215,7 @@ int read_scene(char* json_input, Scene scene){
 
 // This method creates the viewplane and loops through each object checking for colisions for each ray
 // Each ray is then converted to a pixel on the screen and placed into a pixel array for PPM output.
-int raycast(Pixbuff buffer, Scene scene, int num_objects){
+int raycast(int *buffer, Scene scene, int num_objects, int width, int height){
 
   //camera starts at 0, load in camera dimensions
   double cx = 0;
@@ -217,8 +224,8 @@ int raycast(Pixbuff buffer, Scene scene, int num_objects){
   double w = scene[0].camera.width;
 
   //set the image dimensions
-  int M = PIXELS_M;
-  int N = PIXELS_N;
+  int M = width;
+  int N = height;
 
   double pixheight = h / M;
   double pixwidth = w / N;
@@ -242,21 +249,16 @@ int raycast(Pixbuff buffer, Scene scene, int num_objects){
 
         //check object type and send to appropriate colision check
         switch (scene[i].kind) {
-        case 0:
-          t = cylinder_intersection(Ro, Rd,
-            scene[i].cylinder.center,
-            scene[i].cylinder.radius);
-          break;
         case 1:
           t = sphere_intersection(Ro, Rd,
             scene[i].sphere.center,
             scene[i].sphere.radius);
           break;
-        /*case 2:
+        case 2:
         t = plane_intersection(Ro, Rd,
-          scene[i].sphere.center,
-          scene[i].sphere.radius);
-        break;*/
+          scene[i].plane.center,
+          scene[i].plane.normal);
+        break;
         default:
           // Horrible error
           exit(1);
@@ -297,7 +299,7 @@ int raycast(Pixbuff buffer, Scene scene, int num_objects){
 }
 
 //This method takes an array of color values as integers and writes them to a PPM P3 file.
-int ppm_output(Pixbuff buffer, char *output_file_name, int size, int depth){
+int ppm_output(int *buffer, char *output_file_name, int size, int depth, int width, int height){
 
   // Attempt to open outfile
   FILE *output_file;
@@ -311,15 +313,15 @@ int ppm_output(Pixbuff buffer, char *output_file_name, int size, int depth){
 
   else {
     //Write the PPM P3 header
-    fprintf(output_file, "P3\n%d %d\n%d\n", PIXELS_M, PIXELS_N, depth);
+    fprintf(output_file, "P3\n%d %d\n%d\n", width, height, depth);
     //Append pixel data onto the rest of the file
-      for (int i = 0; i<PIXELS_N; i++)
+      for (int i = 0; i<width; i++)
       {
-        for (int j = 0; j<PIXELS_M; j++)
+        for (int j = 0; j<height; j++)
         {
-          fprintf(output_file, "%d ", buffer[i*PIXELS_M * 3 + 3 * j]);
-          fprintf(output_file, "%d ", buffer[i*PIXELS_M * 3 + 3 * j + 1]);
-          fprintf(output_file, "%d ", buffer[i*PIXELS_M * 3 + 3 * j + 2]);
+          fprintf(output_file, "%d ", buffer[i*width * 3 + 3 * j]);
+          fprintf(output_file, "%d ", buffer[i*width * 3 + 3 * j + 1]);
+          fprintf(output_file, "%d ", buffer[i*width * 3 + 3 * j + 2]);
         }
         // Add newline after each line
         fprintf(output_file, "\n");
@@ -435,67 +437,22 @@ double sphere_intersection(double* Ro, double* Rd, double* C, double r){
   return -1;
 }
 
-double cylinder_intersection(double* Ro, double* Rd,
-           double* C, double r) {
-  // Step 1. Find the equation for the object you are
-  // interested in..  (e.g., cylinder)
-  //
-  // x^2 + z^2 = r^2
-  //
-  // Step 2. Parameterize the equation with a center point
-  // if needed
-  //
-  // (x-Cx)^2 + (z-Cz)^2 = r^2
-  //
-  // Step 3. Substitute the eq for a ray into our object
-  // equation.
-  //
-  // (Rox + t*Rdx - Cx)^2 + (Roz + t*Rdz - Cz)^2 - r^2 = 0
-  //
-  // Step 4. Solve for t.
-  //
-  // Step 4a. Rewrite the equation (flatten).
-  //
-  // -r^2 +
-  // t^2 * Rdx^2 +
-  // t^2 * Rdz^2 +
-  // 2*t * Rox * Rdx -
-  // 2*t * Rdx * Cx +
-  // 2*t * Roz * Rdz -
-  // 2*t * Rdz * Cz +
-  // Rox^2 -
-  // 2*Rox*Cx +
-  // Cx^2 +
-  // Roz^2 -
-  // 2*Roz*Cz +
-  // Cz^2 = 0
-  //
-  // Steb 4b. Rewrite the equation in terms of t.
-  //
-  // t^2 * (Rdx^2 + Rdz^2) +
-  // t * (2 * (Rox * Rdx - Rdx * Cx + Roz * Rdz - Rdz * Cz)) +
-  // Rox^2 - 2*Rox*Cx + Cx^2 + Roz^2 - 2*Roz*Cz + Cz^2 - r^2 = 0
-  //
-  // Use the quadratic equation to solve for t..
-  double a = (sqr(Rd[0]) + sqr(Rd[2]));
-  double b = (2 * (Ro[0] * Rd[0] - Rd[0] * C[0] + Ro[2] * Rd[2] - Rd[2] * C[2]));
-  double c = sqr(Ro[0]) - 2*Ro[0]*C[0] + sqr(C[0]) + sqr(Ro[2]) - 2*Ro[2]*C[2] + sqr(C[2]) - sqr(r);
+double plane_intersection(double* Ro, double* Rd, double* c, double *n){
+  normalize(n);
 
-  double det = sqr(b) - 4 * a * c;
-  if (det < 0) return -1;
+  double v[3];
+  //subtract center of plane from Origin
+  v[0] = c[0] - Ro[0];
+  v[1] = c[1] - Ro[1];
+  v[2] = c[2] - Ro[2];
 
-  det = sqrt(det);
-  
-  double t0 = (-b - det) / (2*a);
-  if (t0 > 0) return t0;
+  //apply the dot product to new vector and normal
+  double t = v[0]*n[0] + v[1]*n[1] + v[2]*n[2];
 
-  double t1 = (-b + det) / (2*a);
-  if (t1 > 0) return t1;
+  double d = n[0]*Rd[0] + n[1]*Rd[1] + n[2]*Rd[2];
 
-  return -1;
-}
-
-double plane_intersection(double* Ro, double* Rd, double* C, double h, double w, double* N){
-  return 0.0;
+  //check for ray miss else return t
+  if(fabs(d) < 0.0001f || t < 0) return -1;
+  return t;
 }
 

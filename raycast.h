@@ -1,9 +1,8 @@
 #define SCENE_FILE "example.json"
 #define OUTPUT_FILE "output.ppm"
 #define ORIGIN 0
-#define PIXELS_M 100
-#define PIXELS_N 100
 #define MAX_DEPTH 255
+#define EXPECTED_ARGS 5
 
 //Needed Structs and Types
 
@@ -36,13 +35,11 @@ typedef struct Pixel{
   int r,g,b;
 } Pixel;
 
-typedef unsigned int Pixbuff[PIXELS_M*PIXELS_N*3];
-
 typedef Object Scene[128];
 //Main method prototypes
 int read_scene(char* json, Scene scene);
-int raycast (Pixbuff buffer, Scene scene, int num_objects);
-int ppm_output(Pixbuff buffer, char *output_file_name, int size, int depth);
+int raycast (int *buffer, Scene scene, int num_objects, int width, int height);
+int ppm_output(int  *buffer, char *output_file_name, int size, int depth, int width, int height);
 
 //Parser prototypes
 double* next_vector(FILE* json);
@@ -54,8 +51,7 @@ int next_c(FILE* json);
 
 //Intersect prototypes and methods
 double sphere_intersection(double* Ro, double* Rd, double* C, double r);
-double cylinder_intersection(double* Ro, double* Rd, double* C, double r);
-double plane_intersection(double* Ro, double* Rd, double* C, double h, double w, double* N);
+double plane_intersection(double* Ro, double* Rd, double* c, double *n);
 static inline double sqr(double v) {
   return v*v;
 }
